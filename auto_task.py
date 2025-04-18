@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from loguru import logger
 
 import io
-from PIL import Image
+
 
 # 配置日志
 class BeijingFormatter:
