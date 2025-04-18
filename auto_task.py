@@ -5,7 +5,7 @@ import os
 import sys
 from datetime import datetime, timedelta, timezone
 from loguru import logger
-import qrcode
+
 import io
 from PIL import Image
 
@@ -22,124 +22,7 @@ logger.remove()
 logger.add(sys.stdout, format=BeijingFormatter.format, level="INFO", colorize=True)
 
 class BilibiliTask:
-    def display_qrcode(self, url):
-        """生成并显示二维码"""
-        try:
-            # 生成二维码
-            qr = qrcode.QRCode(
-                version=1,
-                box_size=10,
-                border=5
-            )
-            qr.add_data(url)
-            qr.make(fit=True)
-            
-            # 创建二维码图片
-            qr_image = qr.make_image(fill_color="black", back_color="white")
-            
-            # 保存二维码图片
-            qr_image.save("login_qr.png")
-            
-            # 在Windows系统下打开二维码图片
-            os.system("start login_qr.png")
-            
-            return True
-        except Exception as e:
-            logger.error(f"生成二维码失败: {str(e)}")
-            return False
-        
-    def generate_qrcode(self):
-        """获取登录二维码"""
-        try:
-            res = requests.get(
-                'https://passport.bilibili.com/x/passport-login/web/qrcode/generate',
-                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0'}
-            )
-            if res.status_code != 200:
-                return None, None
-                
-            data = res.json()
-            if data['code'] != 0:
-                return None, None
-                
-            return data['data']['url'], data['data']['qrcode_key']
-        except Exception as e:
-            logger.error(f"获取二维码失败: {str(e)}")
-            return None, None
 
-    def check_qrcode_status(self, qrcode_key):
-        """检查二维码扫描状态"""
-        try:
-            data = {
-                'qrcode_key': qrcode_key
-            }
-            res = requests.get(
-                'https://passport.bilibili.com/x/passport-login/web/qrcode/poll',
-                params=data,
-                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0'}
-            )
-            if res.status_code != 200:
-                return None
-                
-            return res.json()
-        except Exception as e:
-            logger.error(f"检查扫码状态失败: {str(e)}")
-            return None
-
-    def login_by_qrcode(self):
-        """扫码登录"""
-        qr_url, qrcode_key = self.generate_qrcode()
-        if not qr_url or not qrcode_key:
-            return False, "获取二维码失败"
-            
-        # 显示二维码
-        if not self.display_qrcode(qr_url):
-            return False, "生成二维码失败"
-            
-        logger.info("二维码已生成，请使用哔哩哔哩手机APP扫描登录")
-        
-        for _ in range(120):  # 等待2分钟
-            status = self.check_qrcode_status(qrcode_key)
-            if not status:
-                time.sleep(1)
-                continue
-                
-            if status['code'] == 0:
-                data = status['data']
-                if data['code'] == 0:
-                    try:
-                        # 保存完整的响应数据
-                        with open('auth.json', 'w', encoding='utf-8') as f:
-                            json.dump(status, f, ensure_ascii=False, indent=2)
-                        
-                        # 提取并保存 cookie
-                        cookies = []
-                        # 修改这里: 直接使用url中的参数作为cookie
-                        if 'url' in data:
-                            params = data['url'].split('?')[1].split('&')
-                            for param in params:
-                                key, value = param.split('=')
-                                cookies.append(f"{key}={value}")
-                        
-                        cookie_str = '; '.join(cookies)
-                        
-                        with open('cookie.txt', 'w', encoding='utf-8') as f:
-                            f.write(cookie_str)
-                            
-                        self.cookie = cookie_str
-                        self.headers['Cookie'] = cookie_str
-                        return True, None
-                    except Exception as e:
-                        logger.error(f"解析认证信息失败: {str(e)}")
-                        return False, f"保存认证信息失败: {str(e)}"
-                elif data['code'] == 86038:
-                    return False, "二维码已过期"
-                elif data['code'] == 86090:
-                    logger.info("等待扫码确认...")
-                    
-            time.sleep(1)
-            
-        return False, "二维码已过期"
 
     def __init__(self, cookie):
         self.cookie = cookie
